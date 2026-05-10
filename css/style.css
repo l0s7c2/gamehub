@@ -12,11 +12,16 @@
     --text-dim: #666;
     --accent: #e94560;
     --accent2: #4ecdc4;
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
 }
 
 html {
     font-size: 16px;
+}
+
+::selection {
+    background: var(--accent);
+    color: #fff;
 }
 
 body {
@@ -76,9 +81,15 @@ a {
     cursor: pointer;
 }
 
-.game-item:hover {
+.game-item:hover,
+.game-item:focus-visible {
     border-color: #444;
     background: var(--surface);
+    outline: none;
+}
+
+.game-item:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent);
 }
 
 .game-item.coming-soon {
@@ -210,9 +221,15 @@ a {
     font-family: var(--font);
 }
 
-.btn:hover {
+.btn:hover,
+.btn:focus-visible {
     border-color: #555;
     background: var(--surface);
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 /* Game over overlay */
