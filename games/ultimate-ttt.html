@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>终极井字棋 — GameHub</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: min(90vw, 450px);
+            aspect-ratio: 1;
+            background: #1a1a1a;
+            padding: 6px;
+            border-radius: 8px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .big-cell {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+            background: #111;
+            border-radius: 4px;
+            padding: 4px;
+            position: relative;
+            transition: opacity 0.2s;
+        }
+
+        .big-cell.active {
+            box-shadow: inset 0 0 0 2px var(--accent);
+            background: #1a1015;
+        }
+
+        .big-cell.conquered {
+            opacity: 0.4;
+        }
+
+        .big-cell.free-target:not(.conquered):not(.full):hover {
+            cursor: pointer;
+            background: #1a1a1a;
+        }
+
+        .big-cell-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: 900;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .big-cell-overlay.x { color: var(--accent2); }
+        .big-cell-overlay.o { color: var(--accent); }
+
+        .small-cell {
+            aspect-ratio: 1;
+            background: #0a0a0a;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(0.7rem, 2.5vw, 1.1rem);
+            font-weight: 700;
+            cursor: default;
+            transition: background 0.15s;
+            position: relative;
+            z-index: 3;
+        }
+
+        .small-cell.playable {
+            cursor: pointer;
+        }
+
+        .small-cell.playable:hover {
+            background: #1a1a2e;
+        }
+
+        .small-cell.x { color: var(--accent2); }
+        .small-cell.o { color: var(--accent); }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .current-turn {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .current-turn .mark-x { color: var(--accent2); }
+        .current-turn .mark-o { color: var(--accent); }
+
+        .hint {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a class="back-link" href="../index.html">← 返回</a>
+
+        <div class="game-wrapper">
+            <div class="status-bar">
+                <span class="current-turn" id="turn-indicator"></span>
+                <span class="hint" id="hint-text"></span>
+            </div>
+
+            <div class="score">
+                <div class="score-item">
+                    <div class="score-label mark-x">X 占领</div>
+                    <div class="score-value" id="score-x">0</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label mark-o">O 占领</div>
+                    <div class="score-value" id="score-o">0</div>
+                </div>
+            </div>
+
+            <div class="board" id="board"></div>
+
+            <button class="btn" id="reset-btn" style="margin-top:24px;">重新开始</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" style="display:none;">
+        <div class="overlay-content">
+            <h2 id="overlay-title"></h2>
+            <p id="overlay-msg"></p>
+            <button class="btn" id="overlay-btn">再来一局</button>
+        </div>
+    </div>
+
+    <script>
+    /* === Game logic — to be implemented in Task 5 === */
+    </script>
+</body>
+</html>
