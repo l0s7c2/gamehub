@@ -39,8 +39,7 @@
             opacity: 0.4;
         }
 
-        .big-cell.free-target:not(.conquered):not(.full):hover {
-            cursor: pointer;
+        .big-cell.free-target:not(.conquered):not(.full) {
             background: #1a1a1a;
         }
 
@@ -198,6 +197,22 @@
         return state.bigBoard.filter(c => c === player).length;
     }
 
+    function isGameDead() {
+        for (let i = 0; i < 9; i++) {
+            if (state.bigBoard[i] === null && !isBigCellFull(i)) return false;
+        }
+        return true;
+    }
+
+    function resolveGameOver() {
+        const xCount = countConquered('X');
+        const oCount = countConquered('O');
+        if (xCount > oCount) state.winner = 'X';
+        else if (oCount > xCount) state.winner = 'O';
+        else state.winner = 'draw';
+        state.gameOver = true;
+    }
+
     function getNextActiveCell(smallIdx) {
         if (state.bigBoard[smallIdx] !== null || isBigCellFull(smallIdx)) {
             return null;
@@ -220,13 +235,8 @@
         if (gameWinner) {
             state.gameOver = true;
             state.winner = gameWinner;
-        } else if (state.bigBoard.every(c => c !== null)) {
-            state.gameOver = true;
-            const xCount = countConquered('X');
-            const oCount = countConquered('O');
-            if (xCount > oCount) state.winner = 'X';
-            else if (oCount > xCount) state.winner = 'O';
-            else state.winner = 'draw';
+        } else if (isGameDead()) {
+            resolveGameOver();
         }
 
         state.currentPlayer = state.currentPlayer === 'X' ? 'O' : 'X';
@@ -251,10 +261,10 @@
             }
             if (state.bigBoard[bi] !== null) {
                 bigEl.classList.add('conquered');
-                const overlay = document.createElement('div');
-                overlay.className = 'big-cell-overlay ' + state.bigBoard[bi].toLowerCase();
-                overlay.textContent = state.bigBoard[bi];
-                bigEl.appendChild(overlay);
+                const overlayEl = document.createElement('div');
+                overlayEl.className = 'big-cell-overlay ' + state.bigBoard[bi].toLowerCase();
+                overlayEl.textContent = state.bigBoard[bi];
+                bigEl.appendChild(overlayEl);
             } else if (isBigCellFull(bi)) {
                 bigEl.classList.add('full');
             }
