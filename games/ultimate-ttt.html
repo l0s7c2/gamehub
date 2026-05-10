@@ -34,7 +34,8 @@
             background: #1a1015;
         }
 
-        .big-cell.conquered {
+        .big-cell.conquered,
+        .big-cell.full {
             opacity: 0.4;
         }
 
@@ -254,6 +255,8 @@
                 overlay.className = 'big-cell-overlay ' + state.bigBoard[bi].toLowerCase();
                 overlay.textContent = state.bigBoard[bi];
                 bigEl.appendChild(overlay);
+            } else if (isBigCellFull(bi)) {
+                bigEl.classList.add('full');
             }
 
             for (let si = 0; si < 9; si++) {
