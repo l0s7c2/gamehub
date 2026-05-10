@@ -141,7 +141,189 @@
     </div>
 
     <script>
-    /* === Game logic — to be implemented in Task 5 === */
+(function() {
+    const WIN_LINES = [
+        [0,1,2], [3,4,5], [6,7,8],
+        [0,3,6], [1,4,7], [2,5,8],
+        [0,4,8], [2,4,6]
+    ];
+
+    const boardEl = document.getElementById('board');
+    const turnIndicator = document.getElementById('turn-indicator');
+    const hintText = document.getElementById('hint-text');
+    const scoreXEl = document.getElementById('score-x');
+    const scoreOEl = document.getElementById('score-o');
+    const resetBtn = document.getElementById('reset-btn');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg = document.getElementById('overlay-msg');
+    const overlayBtn = document.getElementById('overlay-btn');
+
+    let state;
+
+    function initState() {
+        state = {
+            board: Array.from({length: 9}, () => Array(9).fill(null)),
+            bigBoard: Array(9).fill(null),
+            currentPlayer: 'X',
+            activeBigCell: 4,
+            gameOver: false,
+            winner: null
+        };
+    }
+
+    function checkWin(cells) {
+        for (const [a,b,c] of WIN_LINES) {
+            if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
+                return cells[a];
+            }
+        }
+        return null;
+    }
+
+    function isBigCellFull(bigIdx) {
+        return state.board[bigIdx].every(cell => cell !== null);
+    }
+
+    function isBigCellPlayable(bigIdx) {
+        if (state.gameOver) return false;
+        if (state.bigBoard[bigIdx] !== null) return false;
+        if (isBigCellFull(bigIdx)) return false;
+        if (state.activeBigCell !== null && state.activeBigCell !== bigIdx) return false;
+        return true;
+    }
+
+    function countConquered(player) {
+        return state.bigBoard.filter(c => c === player).length;
+    }
+
+    function getNextActiveCell(smallIdx) {
+        if (state.bigBoard[smallIdx] !== null || isBigCellFull(smallIdx)) {
+            return null;
+        }
+        return smallIdx;
+    }
+
+    function makeMove(bigIdx, smallIdx) {
+        if (!isBigCellPlayable(bigIdx)) return false;
+        if (state.board[bigIdx][smallIdx] !== null) return false;
+
+        state.board[bigIdx][smallIdx] = state.currentPlayer;
+
+        const bigWinner = checkWin(state.board[bigIdx]);
+        if (bigWinner) {
+            state.bigBoard[bigIdx] = bigWinner;
+        }
+
+        const gameWinner = checkWin(state.bigBoard);
+        if (gameWinner) {
+            state.gameOver = true;
+            state.winner = gameWinner;
+        } else if (state.bigBoard.every(c => c !== null)) {
+            state.gameOver = true;
+            const xCount = countConquered('X');
+            const oCount = countConquered('O');
+            if (xCount > oCount) state.winner = 'X';
+            else if (oCount > xCount) state.winner = 'O';
+            else state.winner = 'draw';
+        }
+
+        state.currentPlayer = state.currentPlayer === 'X' ? 'O' : 'X';
+        state.activeBigCell = getNextActiveCell(smallIdx);
+        return true;
+    }
+
+    function render() {
+        boardEl.innerHTML = '';
+
+        for (let bi = 0; bi < 9; bi++) {
+            const bigEl = document.createElement('div');
+            bigEl.className = 'big-cell';
+
+            if (isBigCellPlayable(bi)) {
+                bigEl.classList.add('active');
+            }
+            if (state.activeBigCell === null && !state.gameOver) {
+                if (state.bigBoard[bi] === null && !isBigCellFull(bi)) {
+                    bigEl.classList.add('free-target');
+                }
+            }
+            if (state.bigBoard[bi] !== null) {
+                bigEl.classList.add('conquered');
+                const overlay = document.createElement('div');
+                overlay.className = 'big-cell-overlay ' + state.bigBoard[bi].toLowerCase();
+                overlay.textContent = state.bigBoard[bi];
+                bigEl.appendChild(overlay);
+            }
+
+            for (let si = 0; si < 9; si++) {
+                const cellEl = document.createElement('div');
+                cellEl.className = 'small-cell';
+                const val = state.board[bi][si];
+                if (val) {
+                    cellEl.textContent = val;
+                    cellEl.classList.add(val.toLowerCase());
+                }
+
+                if (!state.gameOver && isBigCellPlayable(bi) && !val) {
+                    cellEl.classList.add('playable');
+                    cellEl.addEventListener('click', () => {
+                        if (makeMove(bi, si)) {
+                            render();
+                            updateUI();
+                        }
+                    });
+                }
+
+                bigEl.appendChild(cellEl);
+            }
+
+            boardEl.appendChild(bigEl);
+        }
+    }
+
+    function updateUI() {
+        if (state.gameOver) {
+            turnIndicator.innerHTML = '';
+            if (state.winner === 'draw') {
+                hintText.textContent = '平局';
+                overlayTitle.textContent = '平局';
+                overlayMsg.textContent = '双方势均力敌';
+            } else {
+                hintText.textContent = '';
+                const cls = state.winner === 'X' ? 'mark-x' : 'mark-o';
+                turnIndicator.innerHTML = '<span class="' + cls + '">' + state.winner + '</span> 获胜';
+                overlayTitle.innerHTML = '<span class="' + cls + '">' + state.winner + '</span> 获胜';
+                overlayMsg.textContent = '大局已定';
+            }
+            overlay.style.display = 'flex';
+        } else {
+            overlay.style.display = 'none';
+            const cls = state.currentPlayer === 'X' ? 'mark-x' : 'mark-o';
+            turnIndicator.innerHTML = '轮到 <span class="' + cls + '">' + state.currentPlayer + '</span>';
+
+            if (state.activeBigCell === null) {
+                hintText.textContent = '自由选择任意大格';
+            } else {
+                hintText.textContent = '高亮区域落子';
+            }
+        }
+
+        scoreXEl.textContent = countConquered('X');
+        scoreOEl.textContent = countConquered('O');
+    }
+
+    function startGame() {
+        initState();
+        render();
+        updateUI();
+    }
+
+    resetBtn.addEventListener('click', startGame);
+    overlayBtn.addEventListener('click', startGame);
+
+    startGame();
+})();
     </script>
 </body>
 </html>
