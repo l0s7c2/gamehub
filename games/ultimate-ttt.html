@@ -6,17 +6,18 @@
     <title>终极井字棋 — GameHub</title>
     <link rel="stylesheet" href="../css/style.css">
     <style>
+        .board-wrap {
+            width: min(92vw, 460px);
+        }
+
         .board {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 8px;
-            width: min(90vw, 480px);
-            height: min(90vw, 480px);
             background: #555;
             padding: 8px;
             border-radius: 8px;
             border: 3px solid #666;
-            flex-shrink: 0;
         }
 
         .big-cell {
@@ -37,12 +38,10 @@
         }
 
         .big-cell.free-target {
-            border-color: #444;
+            border-color: #3a3a3a;
         }
 
-        .big-cell.done {
-            opacity: 0.45;
-        }
+        .big-cell.done { opacity: 0.4; }
 
         .big-cell-overlay {
             position: absolute;
@@ -50,39 +49,32 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: 900;
             pointer-events: none;
             z-index: 2;
-            border-radius: 2px;
         }
 
         .big-cell-overlay.x { color: var(--accent2); }
         .big-cell-overlay.o { color: var(--accent); }
 
         .small-cell {
+            aspect-ratio: 1;
             background: #0d0d0d;
             border-radius: 2px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(0.7rem, 2.5vw, 1.1rem);
+            font-size: clamp(0.6rem, 2vw, 1rem);
             font-weight: 700;
             cursor: default;
             transition: background 0.1s;
             position: relative;
             z-index: 3;
-            aspect-ratio: 1;
         }
 
-        .small-cell.playable {
-            cursor: pointer;
-        }
-
-        .small-cell.playable:hover {
-            background: #1a1a2e;
-        }
-
+        .small-cell.playable { cursor: pointer; }
+        .small-cell.playable:hover { background: #1a1a2e; }
         .small-cell.x { color: var(--accent2); }
         .small-cell.o { color: var(--accent); }
 
@@ -93,30 +85,20 @@
             margin-bottom: 16px;
         }
 
-        .current-turn {
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
+        .current-turn { font-size: 1rem; font-weight: 600; }
         .current-turn .mark-x { color: var(--accent2); }
         .current-turn .mark-o { color: var(--accent); }
-
-        .hint {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-        }
+        .hint { font-size: 0.8rem; color: var(--text-dim); }
     </style>
 </head>
 <body>
     <div class="container">
         <a class="back-link" href="../index.html">← 返回</a>
-
         <div class="game-wrapper">
             <div class="status-bar">
                 <span class="current-turn" id="turn-indicator"></span>
                 <span class="hint" id="hint-text"></span>
             </div>
-
             <div class="score">
                 <div class="score-item">
                     <div class="score-label mark-x">X 占领</div>
@@ -127,9 +109,9 @@
                     <div class="score-value" id="score-o">0</div>
                 </div>
             </div>
-
-            <div class="board" id="board"></div>
-
+            <div class="board-wrap">
+                <div class="board" id="board"></div>
+            </div>
             <button class="btn" id="reset-btn" style="margin-top:24px;">重新开始</button>
         </div>
     </div>
@@ -143,39 +125,38 @@
     </div>
 
     <script>
-(function() {
+(function () {
     const WIN_LINES = [
         [0,1,2],[3,4,5],[6,7,8],
         [0,3,6],[1,4,7],[2,5,8],
         [0,4,8],[2,4,6]
     ];
 
-    const boardEl       = document.getElementById('board');
-    const turnIndicator = document.getElementById('turn-indicator');
-    const hintText      = document.getElementById('hint-text');
-    const scoreXEl      = document.getElementById('score-x');
-    const scoreOEl      = document.getElementById('score-o');
-    const overlay       = document.getElementById('overlay');
-    const overlayTitle  = document.getElementById('overlay-title');
-    const overlayMsg    = document.getElementById('overlay-msg');
+    const $ = id => document.getElementById(id);
+    const boardEl      = $('board');
+    const turnEl       = $('turn-indicator');
+    const hintEl       = $('hint-text');
+    const scoreX       = $('score-x');
+    const scoreO       = $('score-o');
+    const overlay      = $('overlay');
+    const overlayTitle = $('overlay-title');
+    const overlayMsg   = $('overlay-msg');
 
-    /* DOM refs built once */
-    const bigEls   = [];   /* bigEls[bi] */
-    const smallEls = [];   /* smallEls[bi][si] */
-    const overlayEls = []; /* overlayEls[bi] */
+    /* DOM refs — built once */
+    const bigEls     = [];
+    const smallEls   = [];
+    const ovEls      = [];
 
-    let state;
+    let board, bigBoard, player, active, over, winner;
 
-    /* ── state helpers ── */
-    function initState() {
-        state = {
-            board: Array.from({length:9}, () => Array(9).fill(null)),
-            bigBoard: Array(9).fill(null),
-            currentPlayer: 'X',
-            activeBigCell: null,
-            gameOver: false,
-            winner: null
-        };
+    function reset() {
+        board  = Array.from({length:9}, () => Array(9).fill(null));
+        bigBoard = Array(9).fill(null);
+        player = 'X';
+        active = null;
+        over   = false;
+        winner = null;
+        patch();
     }
 
     function checkWin(cells) {
@@ -185,144 +166,112 @@
         return null;
     }
 
-    function isFull(bi) { return state.board[bi].every(c => c !== null); }
+    function isFull(bi)    { return board[bi].every(c => c); }
+    function isDone(bi)    { return bigBoard[bi] || isFull(bi); }
+    function isPlayable(bi){ return !over && !isDone(bi) && (active === null || active === bi); }
+    function conquered(p)  { return bigBoard.filter(c => c === p).length; }
 
-    function isDone(bi) { return state.bigBoard[bi] !== null || isFull(bi); }
+    function click(bi, si) {
+        if (!isPlayable(bi) || board[bi][si]) return;
+        board[bi][si] = player;
 
-    function isPlayable(bi) {
-        if (state.gameOver || isDone(bi)) return false;
-        return state.activeBigCell === null || state.activeBigCell === bi;
-    }
+        if (!bigBoard[bi] && checkWin(board[bi])) bigBoard[bi] = player;
 
-    function countConquered(p) { return state.bigBoard.filter(c => c === p).length; }
-
-    /* ── build DOM once ── */
-    function buildDOM() {
-        boardEl.innerHTML = '';
-        bigEls.length = 0;
-        smallEls.length = 0;
-        overlayEls.length = 0;
-
-        for (let bi = 0; bi < 9; bi++) {
-            const bigEl = document.createElement('div');
-            bigEl.className = 'big-cell';
-
-            const ov = document.createElement('div');
-            ov.className = 'big-cell-overlay';
-            ov.style.display = 'none';
-            bigEl.appendChild(ov);
-            overlayEls.push(ov);
-
-            const cells = [];
-            for (let si = 0; si < 9; si++) {
-                const cell = document.createElement('div');
-                cell.className = 'small-cell';
-                cell.addEventListener('click', () => handleClick(bi, si));
-                bigEl.appendChild(cell);
-                cells.push(cell);
-            }
-
-            boardEl.appendChild(bigEl);
-            bigEls.push(bigEl);
-            smallEls.push(cells);
+        const gw = checkWin(bigBoard);
+        if (gw) {
+            over = true; winner = gw;
+        } else if (bigBoard.every((c,i) => c || isFull(i))) {
+            const x = conquered('X'), o = conquered('O');
+            over = true; winner = x > o ? 'X' : o > x ? 'O' : 'draw';
         }
+
+        player = player === 'X' ? 'O' : 'X';
+        active = (!over && !isDone(si)) ? si : null;
+        patch();
     }
 
-    /* ── patch DOM to match state (no rebuild) ── */
     function patch() {
         for (let bi = 0; bi < 9; bi++) {
-            const bigEl = bigEls[bi];
             const playable = isPlayable(bi);
-            const done = isDone(bi);
-            const free = !state.gameOver && state.activeBigCell === null && !done;
+            const done     = isDone(bi);
+            const free     = !over && active === null && !done;
+            const el       = bigEls[bi];
 
-            bigEl.classList.toggle('active',      playable);
-            bigEl.classList.toggle('done',        done);
-            bigEl.classList.toggle('free-target', free && !playable);
+            el.className = 'big-cell' +
+                (playable ? ' active' : '') +
+                (done     ? ' done'   : '') +
+                (free && !playable ? ' free-target' : '');
 
-            /* big-cell overlay */
-            const ov = overlayEls[bi];
-            const owner = state.bigBoard[bi];
-            if (owner) {
-                ov.textContent = owner;
-                ov.className = 'big-cell-overlay ' + owner.toLowerCase();
+            const ov = ovEls[bi];
+            if (bigBoard[bi]) {
+                ov.textContent = bigBoard[bi];
+                ov.className   = 'big-cell-overlay ' + bigBoard[bi].toLowerCase();
                 ov.style.display = 'flex';
             } else {
                 ov.style.display = 'none';
             }
 
-            /* small cells */
             for (let si = 0; si < 9; si++) {
+                const v    = board[bi][si];
                 const cell = smallEls[bi][si];
-                const val = state.board[bi][si];
-                cell.textContent = val || '';
-                cell.className = 'small-cell' +
-                    (val ? ' ' + val.toLowerCase() : '') +
-                    (!state.gameOver && playable && !val ? ' playable' : '');
+                cell.textContent = v || '';
+                cell.className   = 'small-cell' +
+                    (v ? ' ' + v.toLowerCase() : '') +
+                    (!over && playable && !v ? ' playable' : '');
             }
         }
 
-        /* scores */
-        scoreXEl.textContent = countConquered('X');
-        scoreOEl.textContent = countConquered('O');
+        scoreX.textContent = conquered('X');
+        scoreO.textContent = conquered('O');
 
-        /* status */
-        if (state.gameOver) {
-            if (state.winner === 'draw') {
-                turnIndicator.innerHTML = '平局';
+        if (over) {
+            if (winner === 'draw') {
+                turnEl.innerHTML      = '平局';
                 overlayTitle.textContent = '平局';
-                overlayMsg.textContent = '双方势均力敌';
+                overlayMsg.textContent   = '双方势均力敌';
             } else {
-                const cls = state.winner === 'X' ? 'mark-x' : 'mark-o';
-                turnIndicator.innerHTML = '<span class="' + cls + '">' + state.winner + '</span> 获胜';
-                overlayTitle.innerHTML  = '<span class="' + cls + '">' + state.winner + '</span> 获胜';
-                overlayMsg.textContent  = '大局已定';
+                const cls = winner === 'X' ? 'mark-x' : 'mark-o';
+                turnEl.innerHTML         = `<span class="${cls}">${winner}</span> 获胜`;
+                overlayTitle.innerHTML   = `<span class="${cls}">${winner}</span> 获胜`;
+                overlayMsg.textContent   = '大局已定';
             }
-            hintText.textContent = '';
+            hintEl.textContent    = '';
             overlay.style.display = 'flex';
         } else {
             overlay.style.display = 'none';
-            const cls = state.currentPlayer === 'X' ? 'mark-x' : 'mark-o';
-            turnIndicator.innerHTML = '轮到 <span class="' + cls + '">' + state.currentPlayer + '</span>';
-            hintText.textContent = state.activeBigCell === null ? '自由选择任意大格' : '在高亮区域落子';
+            const cls = player === 'X' ? 'mark-x' : 'mark-o';
+            turnEl.innerHTML   = `轮到 <span class="${cls}">${player}</span>`;
+            hintEl.textContent = active === null ? '自由选择任意大格' : '在高亮区域落子';
         }
     }
 
-    /* ── game logic ── */
-    function handleClick(bi, si) {
-        if (!isPlayable(bi) || state.board[bi][si]) return;
+    /* build DOM once */
+    for (let bi = 0; bi < 9; bi++) {
+        const bigEl = document.createElement('div');
+        bigEl.className = 'big-cell';
 
-        state.board[bi][si] = state.currentPlayer;
+        const ov = document.createElement('div');
+        ov.style.display = 'none';
+        bigEl.appendChild(ov);
+        ovEls.push(ov);
 
-        if (!state.bigBoard[bi] && checkWin(state.board[bi]))
-            state.bigBoard[bi] = state.currentPlayer;
-
-        const gameWinner = checkWin(state.bigBoard);
-        if (gameWinner) {
-            state.gameOver = true;
-            state.winner = gameWinner;
-        } else if (state.bigBoard.every((c,i) => c !== null || isFull(i))) {
-            const x = countConquered('X'), o = countConquered('O');
-            state.gameOver = true;
-            state.winner = x > o ? 'X' : o > x ? 'O' : 'draw';
+        const cells = [];
+        for (let si = 0; si < 9; si++) {
+            const cell = document.createElement('div');
+            cell.className = 'small-cell';
+            cell.addEventListener('click', () => click(bi, si));
+            bigEl.appendChild(cell);
+            cells.push(cell);
         }
 
-        state.currentPlayer = state.currentPlayer === 'X' ? 'O' : 'X';
-        state.activeBigCell = (!state.gameOver && !isDone(si)) ? si : null;
-
-        patch();
+        boardEl.appendChild(bigEl);
+        bigEls.push(bigEl);
+        smallEls.push(cells);
     }
 
-    function startGame() {
-        initState();
-        patch();
-    }
-
-    document.getElementById('reset-btn').addEventListener('click', startGame);
-    document.getElementById('overlay-btn').addEventListener('click', startGame);
-
-    buildDOM();
-    startGame();
+    $('reset-btn').addEventListener('click', reset);
+    $('overlay-btn').addEventListener('click', reset);
+    reset();
 })();
     </script>
 </body>
