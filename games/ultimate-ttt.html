@@ -8,16 +8,18 @@
     <style>
         .board-wrap {
             width: min(92vw, 460px);
+            padding: 10px;
+            background: #555;
+            border-radius: 10px;
+            box-sizing: border-box;
         }
 
         .board {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 8px;
-            background: #555;
-            padding: 8px;
-            border-radius: 8px;
-            border: 3px solid #666;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .big-cell {
