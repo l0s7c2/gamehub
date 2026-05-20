@@ -9,39 +9,39 @@
         .board {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            width: min(90vw, 450px);
-            height: min(90vw, 450px);
-            background: #444;
-            padding: 6px;
+            gap: 8px;
+            width: min(90vw, 480px);
+            height: min(90vw, 480px);
+            background: #555;
+            padding: 8px;
             border-radius: 8px;
-            border: 2px solid #555;
+            border: 3px solid #666;
             flex-shrink: 0;
         }
 
         .big-cell {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 2px;
-            background: #333;
+            gap: 3px;
+            background: #2a2a2a;
             border-radius: 4px;
-            padding: 4px;
+            padding: 5px;
             position: relative;
-            transition: opacity 0.2s;
+            border: 2px solid transparent;
+            transition: border-color 0.15s, background 0.15s;
         }
 
         .big-cell.active {
-            box-shadow: inset 0 0 0 2px var(--accent);
+            border-color: var(--accent);
             background: #1a1015;
         }
 
-        .big-cell.conquered,
-        .big-cell.full {
-            opacity: 0.4;
+        .big-cell.free-target {
+            border-color: #444;
         }
 
-        .big-cell.free-target:not(.conquered):not(.full) {
-            background: #1a1a1a;
+        .big-cell.done {
+            opacity: 0.45;
         }
 
         .big-cell-overlay {
@@ -54,14 +54,14 @@
             font-weight: 900;
             pointer-events: none;
             z-index: 2;
+            border-radius: 2px;
         }
 
         .big-cell-overlay.x { color: var(--accent2); }
         .big-cell-overlay.o { color: var(--accent); }
 
         .small-cell {
-            aspect-ratio: 1;
-            background: #0a0a0a;
+            background: #0d0d0d;
             border-radius: 2px;
             display: flex;
             align-items: center;
@@ -69,9 +69,10 @@
             font-size: clamp(0.7rem, 2.5vw, 1.1rem);
             font-weight: 700;
             cursor: default;
-            transition: background 0.15s;
+            transition: background 0.1s;
             position: relative;
             z-index: 3;
+            aspect-ratio: 1;
         }
 
         .small-cell.playable {
@@ -144,198 +145,183 @@
     <script>
 (function() {
     const WIN_LINES = [
-        [0,1,2], [3,4,5], [6,7,8],
-        [0,3,6], [1,4,7], [2,5,8],
-        [0,4,8], [2,4,6]
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
     ];
 
-    const boardEl = document.getElementById('board');
+    const boardEl       = document.getElementById('board');
     const turnIndicator = document.getElementById('turn-indicator');
-    const hintText = document.getElementById('hint-text');
-    const scoreXEl = document.getElementById('score-x');
-    const scoreOEl = document.getElementById('score-o');
-    const resetBtn = document.getElementById('reset-btn');
-    const overlay = document.getElementById('overlay');
-    const overlayTitle = document.getElementById('overlay-title');
-    const overlayMsg = document.getElementById('overlay-msg');
-    const overlayBtn = document.getElementById('overlay-btn');
+    const hintText      = document.getElementById('hint-text');
+    const scoreXEl      = document.getElementById('score-x');
+    const scoreOEl      = document.getElementById('score-o');
+    const overlay       = document.getElementById('overlay');
+    const overlayTitle  = document.getElementById('overlay-title');
+    const overlayMsg    = document.getElementById('overlay-msg');
+
+    /* DOM refs built once */
+    const bigEls   = [];   /* bigEls[bi] */
+    const smallEls = [];   /* smallEls[bi][si] */
+    const overlayEls = []; /* overlayEls[bi] */
 
     let state;
 
+    /* ── state helpers ── */
     function initState() {
         state = {
-            board: Array.from({length: 9}, () => Array(9).fill(null)),
+            board: Array.from({length:9}, () => Array(9).fill(null)),
             bigBoard: Array(9).fill(null),
             currentPlayer: 'X',
-            activeBigCell: 4,
+            activeBigCell: null,
             gameOver: false,
             winner: null
         };
     }
 
     function checkWin(cells) {
-        for (const [a,b,c] of WIN_LINES) {
-            if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
+        for (const [a,b,c] of WIN_LINES)
+            if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c])
                 return cells[a];
-            }
-        }
         return null;
     }
 
-    function isBigCellFull(bigIdx) {
-        return state.board[bigIdx].every(cell => cell !== null);
+    function isFull(bi) { return state.board[bi].every(c => c !== null); }
+
+    function isDone(bi) { return state.bigBoard[bi] !== null || isFull(bi); }
+
+    function isPlayable(bi) {
+        if (state.gameOver || isDone(bi)) return false;
+        return state.activeBigCell === null || state.activeBigCell === bi;
     }
 
-    function isBigCellPlayable(bigIdx) {
-        if (state.gameOver) return false;
-        if (state.bigBoard[bigIdx] !== null) return false;
-        if (isBigCellFull(bigIdx)) return false;
-        if (state.activeBigCell !== null && state.activeBigCell !== bigIdx) return false;
-        return true;
-    }
+    function countConquered(p) { return state.bigBoard.filter(c => c === p).length; }
 
-    function countConquered(player) {
-        return state.bigBoard.filter(c => c === player).length;
-    }
-
-    function isGameDead() {
-        for (let i = 0; i < 9; i++) {
-            if (state.bigBoard[i] === null && !isBigCellFull(i)) return false;
-        }
-        return true;
-    }
-
-    function resolveGameOver() {
-        const xCount = countConquered('X');
-        const oCount = countConquered('O');
-        if (xCount > oCount) state.winner = 'X';
-        else if (oCount > xCount) state.winner = 'O';
-        else state.winner = 'draw';
-        state.gameOver = true;
-    }
-
-    function getNextActiveCell(smallIdx) {
-        if (state.bigBoard[smallIdx] !== null || isBigCellFull(smallIdx)) {
-            return null;
-        }
-        return smallIdx;
-    }
-
-    function makeMove(bigIdx, smallIdx) {
-        if (!isBigCellPlayable(bigIdx)) return false;
-        if (state.board[bigIdx][smallIdx] !== null) return false;
-
-        state.board[bigIdx][smallIdx] = state.currentPlayer;
-
-        const bigWinner = checkWin(state.board[bigIdx]);
-        if (bigWinner) {
-            state.bigBoard[bigIdx] = bigWinner;
-        }
-
-        const gameWinner = checkWin(state.bigBoard);
-        if (gameWinner) {
-            state.gameOver = true;
-            state.winner = gameWinner;
-        } else if (isGameDead()) {
-            resolveGameOver();
-        }
-
-        state.currentPlayer = state.currentPlayer === 'X' ? 'O' : 'X';
-        state.activeBigCell = getNextActiveCell(smallIdx);
-        return true;
-    }
-
-    function render() {
+    /* ── build DOM once ── */
+    function buildDOM() {
         boardEl.innerHTML = '';
+        bigEls.length = 0;
+        smallEls.length = 0;
+        overlayEls.length = 0;
 
         for (let bi = 0; bi < 9; bi++) {
             const bigEl = document.createElement('div');
             bigEl.className = 'big-cell';
 
-            if (isBigCellPlayable(bi)) {
-                bigEl.classList.add('active');
-            }
-            if (state.activeBigCell === null && !state.gameOver) {
-                if (state.bigBoard[bi] === null && !isBigCellFull(bi)) {
-                    bigEl.classList.add('free-target');
-                }
-            }
-            if (state.bigBoard[bi] !== null) {
-                bigEl.classList.add('conquered');
-                const overlayEl = document.createElement('div');
-                overlayEl.className = 'big-cell-overlay ' + state.bigBoard[bi].toLowerCase();
-                overlayEl.textContent = state.bigBoard[bi];
-                bigEl.appendChild(overlayEl);
-            } else if (isBigCellFull(bi)) {
-                bigEl.classList.add('full');
-            }
+            const ov = document.createElement('div');
+            ov.className = 'big-cell-overlay';
+            ov.style.display = 'none';
+            bigEl.appendChild(ov);
+            overlayEls.push(ov);
 
+            const cells = [];
             for (let si = 0; si < 9; si++) {
-                const cellEl = document.createElement('div');
-                cellEl.className = 'small-cell';
-                const val = state.board[bi][si];
-                if (val) {
-                    cellEl.textContent = val;
-                    cellEl.classList.add(val.toLowerCase());
-                }
-
-                if (!state.gameOver && isBigCellPlayable(bi) && !val) {
-                    cellEl.classList.add('playable');
-                    cellEl.addEventListener('click', () => {
-                        if (makeMove(bi, si)) {
-                            render();
-                            updateUI();
-                        }
-                    });
-                }
-
-                bigEl.appendChild(cellEl);
+                const cell = document.createElement('div');
+                cell.className = 'small-cell';
+                cell.addEventListener('click', () => handleClick(bi, si));
+                bigEl.appendChild(cell);
+                cells.push(cell);
             }
 
             boardEl.appendChild(bigEl);
+            bigEls.push(bigEl);
+            smallEls.push(cells);
         }
     }
 
-    function updateUI() {
+    /* ── patch DOM to match state (no rebuild) ── */
+    function patch() {
+        for (let bi = 0; bi < 9; bi++) {
+            const bigEl = bigEls[bi];
+            const playable = isPlayable(bi);
+            const done = isDone(bi);
+            const free = !state.gameOver && state.activeBigCell === null && !done;
+
+            bigEl.classList.toggle('active',      playable);
+            bigEl.classList.toggle('done',        done);
+            bigEl.classList.toggle('free-target', free && !playable);
+
+            /* big-cell overlay */
+            const ov = overlayEls[bi];
+            const owner = state.bigBoard[bi];
+            if (owner) {
+                ov.textContent = owner;
+                ov.className = 'big-cell-overlay ' + owner.toLowerCase();
+                ov.style.display = 'flex';
+            } else {
+                ov.style.display = 'none';
+            }
+
+            /* small cells */
+            for (let si = 0; si < 9; si++) {
+                const cell = smallEls[bi][si];
+                const val = state.board[bi][si];
+                cell.textContent = val || '';
+                cell.className = 'small-cell' +
+                    (val ? ' ' + val.toLowerCase() : '') +
+                    (!state.gameOver && playable && !val ? ' playable' : '');
+            }
+        }
+
+        /* scores */
+        scoreXEl.textContent = countConquered('X');
+        scoreOEl.textContent = countConquered('O');
+
+        /* status */
         if (state.gameOver) {
-            turnIndicator.innerHTML = '';
             if (state.winner === 'draw') {
-                hintText.textContent = '平局';
+                turnIndicator.innerHTML = '平局';
                 overlayTitle.textContent = '平局';
                 overlayMsg.textContent = '双方势均力敌';
             } else {
-                hintText.textContent = '';
                 const cls = state.winner === 'X' ? 'mark-x' : 'mark-o';
                 turnIndicator.innerHTML = '<span class="' + cls + '">' + state.winner + '</span> 获胜';
-                overlayTitle.innerHTML = '<span class="' + cls + '">' + state.winner + '</span> 获胜';
-                overlayMsg.textContent = '大局已定';
+                overlayTitle.innerHTML  = '<span class="' + cls + '">' + state.winner + '</span> 获胜';
+                overlayMsg.textContent  = '大局已定';
             }
+            hintText.textContent = '';
             overlay.style.display = 'flex';
         } else {
             overlay.style.display = 'none';
             const cls = state.currentPlayer === 'X' ? 'mark-x' : 'mark-o';
             turnIndicator.innerHTML = '轮到 <span class="' + cls + '">' + state.currentPlayer + '</span>';
+            hintText.textContent = state.activeBigCell === null ? '自由选择任意大格' : '在高亮区域落子';
+        }
+    }
 
-            if (state.activeBigCell === null) {
-                hintText.textContent = '自由选择任意大格';
-            } else {
-                hintText.textContent = '高亮区域落子';
-            }
+    /* ── game logic ── */
+    function handleClick(bi, si) {
+        if (!isPlayable(bi) || state.board[bi][si]) return;
+
+        state.board[bi][si] = state.currentPlayer;
+
+        if (!state.bigBoard[bi] && checkWin(state.board[bi]))
+            state.bigBoard[bi] = state.currentPlayer;
+
+        const gameWinner = checkWin(state.bigBoard);
+        if (gameWinner) {
+            state.gameOver = true;
+            state.winner = gameWinner;
+        } else if (state.bigBoard.every((c,i) => c !== null || isFull(i))) {
+            const x = countConquered('X'), o = countConquered('O');
+            state.gameOver = true;
+            state.winner = x > o ? 'X' : o > x ? 'O' : 'draw';
         }
 
-        scoreXEl.textContent = countConquered('X');
-        scoreOEl.textContent = countConquered('O');
+        state.currentPlayer = state.currentPlayer === 'X' ? 'O' : 'X';
+        state.activeBigCell = (!state.gameOver && !isDone(si)) ? si : null;
+
+        patch();
     }
 
     function startGame() {
         initState();
-        render();
-        updateUI();
+        patch();
     }
 
-    resetBtn.addEventListener('click', startGame);
-    overlayBtn.addEventListener('click', startGame);
+    document.getElementById('reset-btn').addEventListener('click', startGame);
+    document.getElementById('overlay-btn').addEventListener('click', startGame);
 
+    buildDOM();
     startGame();
 })();
     </script>
