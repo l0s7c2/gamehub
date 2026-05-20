@@ -6,19 +6,14 @@
     <title>终极井字棋 — GameHub</title>
     <link rel="stylesheet" href="../css/style.css">
     <style>
-        .board-wrap {
-            width: min(92vw, 460px);
-            padding: 10px;
-            background: #555;
-            border-radius: 10px;
-            box-sizing: border-box;
-        }
-
         .board {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 8px;
-            width: 100%;
+            width: min(80vw, 420px);
+            background: #555;
+            padding: 8px;
+            border-radius: 10px;
             box-sizing: border-box;
         }
 
@@ -111,9 +106,7 @@
                     <div class="score-value" id="score-o">0</div>
                 </div>
             </div>
-            <div class="board-wrap">
-                <div class="board" id="board"></div>
-            </div>
+            <div class="board" id="board"></div>
             <button class="btn" id="reset-btn" style="margin-top:24px;">重新开始</button>
         </div>
     </div>
