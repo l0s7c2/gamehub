@@ -6,38 +6,54 @@
     <title>终极井字棋 — GameHub</title>
     <link rel="stylesheet" href="../css/style.css">
     <style>
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .mark-x { color: var(--accent2); }
+        .mark-o { color: var(--accent); }
+        .hint { font-size: 0.8rem; color: var(--text-dim); font-weight: 400; }
+
+        /* 棋盘：用 CSS 变量统一控制尺寸，避免各层叠加溢出 */
         .board {
+            --board-size: min(calc(100vw - 48px), 420px);
+            --gap-outer: 6px;
+            --gap-inner: 2px;
+            width: var(--board-size);
+            height: var(--board-size);
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            width: min(80vw, 420px);
-            background: #555;
-            padding: 8px;
-            border-radius: 10px;
+            gap: var(--gap-outer);
+            background: #484848;
+            padding: var(--gap-outer);
+            border-radius: 8px;
             box-sizing: border-box;
+            flex-shrink: 0;
         }
 
         .big-cell {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 3px;
-            background: #2a2a2a;
-            border-radius: 4px;
-            padding: 5px;
+            gap: var(--gap-inner);
+            background: #1e1e1e;
+            padding: var(--gap-inner);
+            border-radius: 3px;
             position: relative;
-            border: 2px solid transparent;
-            transition: border-color 0.15s, background 0.15s;
+            box-sizing: border-box;
         }
 
-        .big-cell.active {
-            background: #1a1015;
-        }
-
-        .big-cell.free-target {
-            border-color: #3a3a3a;
-        }
-
-        .big-cell.done { opacity: 0.4; }
+        .big-cell.done { opacity: 0.38; }
 
         .big-cell-overlay {
             position: absolute;
@@ -45,46 +61,31 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.5rem;
+            font-size: 2.4rem;
             font-weight: 900;
             pointer-events: none;
             z-index: 2;
         }
-
         .big-cell-overlay.x { color: var(--accent2); }
         .big-cell-overlay.o { color: var(--accent); }
 
         .small-cell {
-            aspect-ratio: 1;
             background: #0d0d0d;
             border-radius: 2px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(0.6rem, 2vw, 1rem);
             font-weight: 700;
+            font-size: clamp(0.55rem, 1.8vw, 0.95rem);
             cursor: default;
-            transition: background 0.1s;
             position: relative;
             z-index: 3;
+            transition: background 0.1s;
         }
-
         .small-cell.playable { cursor: pointer; }
         .small-cell.playable:hover { background: #1a1a2e; }
         .small-cell.x { color: var(--accent2); }
         .small-cell.o { color: var(--accent); }
-
-        .status-bar {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-
-        .current-turn { font-size: 1rem; font-weight: 600; }
-        .current-turn .mark-x { color: var(--accent2); }
-        .current-turn .mark-o { color: var(--accent); }
-        .hint { font-size: 0.8rem; color: var(--text-dim); }
     </style>
 </head>
 <body>
@@ -92,7 +93,7 @@
         <a class="back-link" href="../index.html">← 返回</a>
         <div class="game-wrapper">
             <div class="status-bar">
-                <span class="current-turn" id="turn-indicator"></span>
+                <span id="turn-indicator"></span>
                 <span class="hint" id="hint-text"></span>
             </div>
             <div class="score">
@@ -127,29 +128,23 @@
     ];
 
     const $ = id => document.getElementById(id);
-    const boardEl      = $('board');
-    const turnEl       = $('turn-indicator');
-    const hintEl       = $('hint-text');
-    const scoreX       = $('score-x');
-    const scoreO       = $('score-o');
-    const overlay      = $('overlay');
-    const overlayTitle = $('overlay-title');
-    const overlayMsg   = $('overlay-msg');
+    const boardEl = $('board');
 
-    /* DOM refs — built once */
-    const bigEls     = [];
-    const smallEls   = [];
-    const ovEls      = [];
+    // DOM refs built once
+    const bigEls   = [];
+    const smallEls = [];
+    const ovEls    = [];
 
+    // Game state
     let board, bigBoard, player, active, over, winner;
 
     function reset() {
-        board  = Array.from({length:9}, () => Array(9).fill(null));
+        board    = Array.from({length:9}, () => Array(9).fill(null));
         bigBoard = Array(9).fill(null);
-        player = 'X';
-        active = null;
-        over   = false;
-        winner = null;
+        player   = 'X';
+        active   = null;
+        over     = false;
+        winner   = null;
         patch();
     }
 
@@ -160,16 +155,17 @@
         return null;
     }
 
-    function isFull(bi)    { return board[bi].every(c => c); }
-    function isDone(bi)    { return bigBoard[bi] || isFull(bi); }
-    function isPlayable(bi){ return !over && !isDone(bi) && (active === null || active === bi); }
-    function conquered(p)  { return bigBoard.filter(c => c === p).length; }
+    function isFull(bi)     { return board[bi].every(c => c); }
+    function isDone(bi)     { return bigBoard[bi] || isFull(bi); }
+    function isPlayable(bi) { return !over && !isDone(bi) && (active === null || active === bi); }
+    function conquered(p)   { return bigBoard.filter(c => c === p).length; }
 
-    function click(bi, si) {
+    function handleClick(bi, si) {
         if (!isPlayable(bi) || board[bi][si]) return;
         board[bi][si] = player;
 
-        if (!bigBoard[bi] && checkWin(board[bi])) bigBoard[bi] = player;
+        if (!bigBoard[bi] && checkWin(board[bi]))
+            bigBoard[bi] = player;
 
         const gw = checkWin(bigBoard);
         if (gw) {
@@ -187,19 +183,12 @@
     function patch() {
         for (let bi = 0; bi < 9; bi++) {
             const playable = isPlayable(bi);
-            const done     = isDone(bi);
-            const free     = !over && active === null && !done;
-            const el       = bigEls[bi];
-
-            el.className = 'big-cell' +
-                (playable ? ' active' : '') +
-                (done     ? ' done'   : '') +
-                (free && !playable ? ' free-target' : '');
+            bigEls[bi].className = 'big-cell' + (isDone(bi) ? ' done' : '');
 
             const ov = ovEls[bi];
             if (bigBoard[bi]) {
-                ov.textContent = bigBoard[bi];
-                ov.className   = 'big-cell-overlay ' + bigBoard[bi].toLowerCase();
+                ov.textContent   = bigBoard[bi];
+                ov.className     = 'big-cell-overlay ' + bigBoard[bi].toLowerCase();
                 ov.style.display = 'flex';
             } else {
                 ov.style.display = 'none';
@@ -215,19 +204,23 @@
             }
         }
 
-        scoreX.textContent = conquered('X');
-        scoreO.textContent = conquered('O');
+        $('score-x').textContent = conquered('X');
+        $('score-o').textContent = conquered('O');
+
+        const turnEl = $('turn-indicator');
+        const hintEl = $('hint-text');
+        const overlay = $('overlay');
 
         if (over) {
             if (winner === 'draw') {
-                turnEl.innerHTML      = '平局';
-                overlayTitle.textContent = '平局';
-                overlayMsg.textContent   = '双方势均力敌';
+                turnEl.innerHTML = '平局';
+                $('overlay-title').textContent = '平局';
+                $('overlay-msg').textContent   = '双方势均力敌';
             } else {
                 const cls = winner === 'X' ? 'mark-x' : 'mark-o';
-                turnEl.innerHTML         = `<span class="${cls}">${winner}</span> 获胜`;
-                overlayTitle.innerHTML   = `<span class="${cls}">${winner}</span> 获胜`;
-                overlayMsg.textContent   = '大局已定';
+                turnEl.innerHTML = `<span class="${cls}">${winner}</span> 获胜`;
+                $('overlay-title').innerHTML = `<span class="${cls}">${winner}</span> 获胜`;
+                $('overlay-msg').textContent = '大局已定';
             }
             hintEl.textContent    = '';
             overlay.style.display = 'flex';
@@ -239,7 +232,7 @@
         }
     }
 
-    /* build DOM once */
+    // Build DOM once
     for (let bi = 0; bi < 9; bi++) {
         const bigEl = document.createElement('div');
         bigEl.className = 'big-cell';
@@ -253,7 +246,7 @@
         for (let si = 0; si < 9; si++) {
             const cell = document.createElement('div');
             cell.className = 'small-cell';
-            cell.addEventListener('click', () => click(bi, si));
+            cell.addEventListener('click', () => handleClick(bi, si));
             bigEl.appendChild(cell);
             cells.push(cell);
         }
